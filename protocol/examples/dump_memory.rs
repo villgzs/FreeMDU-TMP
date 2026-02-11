@@ -22,10 +22,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Resume dumping process if previously interrupted
     let offset: u32 = file.seek(SeekFrom::End(0))?.try_into()?;
 
-    for addr in (START + offset..=END).step_by(0x80) {
+    for addr in (START + offset..=END).step_by(0x04) {
         println!("Reading memory address {addr:08x}");
 
-        let data: [u8; 0x80] = dev.interface().read_memory(addr).await?;
+        let data: [u8; 0x04] = dev.interface().read_memory(addr).await?;
 
         file.write_all(&data)?;
     }

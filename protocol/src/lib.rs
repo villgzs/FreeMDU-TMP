@@ -401,6 +401,8 @@ impl<P: Read + Write> Interface<P> {
     pub async fn query_software_id(&mut self) -> Result<u16, P::Error> {
         self.send(Request::new(Command::QuerySoftwareId, 0x0000, 0x02).into())
             .await?;
+        self.write(&[0x00, 0x00, 0x00, 0x00])
+            .await?;
 
         Ok(self.receive().await?.into())
     }
@@ -417,7 +419,10 @@ impl<P: Read + Write> Interface<P> {
     /// - [`Interface::read_eeprom`]
     pub async fn unlock_read_access(&mut self, key: u16) -> Result<(), P::Error> {
         self.send(Request::new(Command::UnlockReadAccess, key, 0x00).into())
-            .await
+            .await?;
+        self.write(&[0x00])
+            .await?;
+        Ok(())
     }
 
     /// Reads data from the device's memory.
@@ -457,6 +462,13 @@ impl<P: Read + Write> Interface<P> {
         )
         .await?;
 
+        self.write(&[0x00, 0x00])
+            .await?;
+        for _ in 0..len {
+            self.write(&[0x00])
+                .await?;
+        }
+
         Ok(self.receive().await?.into())
     }
 
@@ -479,6 +491,13 @@ impl<P: Read + Write> Interface<P> {
         self.send(Request::new(Command::ReadEeprom, addr, len).into())
             .await?;
 
+        self.write(&[0x00, 0x00])
+            .await?;
+        for _ in 0..len {
+            self.write(&[0x00])
+                .await?;
+        }
+
         Ok(self.receive().await?.into())
     }
 
@@ -498,7 +517,10 @@ impl<P: Read + Write> Interface<P> {
     /// - [`Interface::set_baud_rate_9600`]
     pub async fn unlock_full_access(&mut self, key: u16) -> Result<(), P::Error> {
         self.send(Request::new(Command::UnlockFullAccess, key, 0x00).into())
-            .await
+            .await?;
+        self.write(&[0x00])
+            .await?;
+        Ok(())
     }
 
     /// Writes data to the device's memory.
