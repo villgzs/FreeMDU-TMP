@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     const START: u16 = 0x0000;
     const END: u16 = 0x07ff;
 
-    let mut port = freemdu::serial::open("/dev/ttyACM0")?;
+    let mut port = freemdu::serial::open("/dev/ttyUSB0")?;
     let mut dev = freemdu::device::connect(&mut port).await?;
     let mut file = OpenOptions::new()
         .create(true)

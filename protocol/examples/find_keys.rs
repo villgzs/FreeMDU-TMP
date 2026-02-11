@@ -60,7 +60,7 @@ async fn find_full_access_key(
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
-    let port = freemdu::serial::open("/dev/ttyACM0")?;
+    let port = freemdu::serial::open("/dev/ttyUSB0")?;
     let mut intf = Interface::new(port);
     let read_key = find_read_access_key(&mut intf).await?;
     let full_key = find_full_access_key(&mut intf, read_key).await?;
