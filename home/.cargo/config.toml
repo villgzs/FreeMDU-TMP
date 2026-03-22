@@ -1,22 +1,23 @@
 [build]
 # Unset default target
-target = ""
+target = "riscv32imac-unknown-none-elf"
+features = "esp32c6"
 
 [env]
-ESP_LOG = "info"
+ESP_LOG = "INFO"
 
 PIN_LED_STATUS = "10"
 PIN_OPTICAL_RX = "0"
 PIN_OPTICAL_TX = "1"
 
-WIFI_SSID = ""
-WIFI_PASSWORD = ""
-MQTT_HOSTNAME = ""
-MQTT_USERNAME = ""
-MQTT_PASSWORD = ""
+WIFI_SSID = "wat leuks"
+WIFI_PASSWORD = "maakdatermaarvan"
+MQTT_HOSTNAME = "192.168.1.10"
+MQTT_USERNAME = "freemdu"
+MQTT_PASSWORD = "PZrmSNk012cqv5EJ"
 
 # Interval (in seconds) for publishing device properties and actions
-DEVICE_PUBLISH_INTERVAL = "60"
+DEVICE_PUBLISH_INTERVAL = "2"
 
 [target.'cfg(target_arch = "riscv32")']
 runner = "espflash flash --monitor"

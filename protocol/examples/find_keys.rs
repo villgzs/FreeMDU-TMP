@@ -4,7 +4,7 @@ use tokio::time;
 
 const UNLOCK_TIMEOUT: Duration = Duration::from_millis(500);
 const ERROR_RETRY_DELAY: Duration = Duration::from_secs(4);
-const CHECK_TIMEOUT: Duration = Duration::from_millis(100);
+const CHECK_TIMEOUT: Duration = Duration::from_millis(200);
 
 async fn find_read_access_key(intf: &mut Interface<Port>) -> Result<u16, Box<dyn Error>> {
     for i in 0x0000..=0xffff {
@@ -60,7 +60,7 @@ async fn find_full_access_key(
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
-    let port = freemdu::serial::open("/dev/ttyACM0")?;
+    let port = freemdu::serial::open("/dev/cu.usbmodem14201")?;
     let mut intf = Interface::new(port);
     let read_key = find_read_access_key(&mut intf).await?;
     let full_key = find_full_access_key(&mut intf, read_key).await?;
