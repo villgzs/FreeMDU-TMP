@@ -10,27 +10,17 @@ use alloc::{
     vec::Vec,
 };
 use anyhow::Result;
-use core::fmt::Write;
 use embassy_executor::Spawner;
 use embassy_futures::select::{self, Either};
-use embassy_net::{DhcpConfig, Runner, Stack, StackResources};
 use embassy_time::{Duration, Ticker, WithTimeout};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Output, interrupt::software::SoftwareInterruptControl, peripherals::WIFI, rng::Rng,
-    timer::timg::TimerGroup,
+    gpio::Output, interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup,
 };
 use esp_println::logger;
-use esp_radio::{
-    Controller,
-    wifi::{
-        self, ClientConfig, CountryInfo, ModeConfig, OperatingClass, WifiController, WifiDevice,
-        WifiEvent,
-    },
-};
 use freemdu::device::{self, Action, ActionKind, Date, Property, PropertyKind, Value};
-use freemdu_home::OpticalPort;
+use freemdu_home::{net, OpticalPort};
 use log::{error, info};
 use mcutie::{
     McutieBuilder, McutieReceiver, McutieTask, MqttMessage, PublishBytes, Publishable, Topic,
@@ -39,7 +29,6 @@ use mcutie::{
         sensor::Sensor,
     },
 };
-use static_cell::StaticCell;
 
 // Interval for publishing device properties and actions
 const DEVICE_PUBLISH_INTERVAL: Duration =
@@ -47,9 +36,6 @@ const DEVICE_PUBLISH_INTERVAL: Duration =
 
 // Timeout for device operations (e.g. connection)
 const DEVICE_TIMEOUT: Duration = Duration::from_secs(1);
-
-// Delay between Wi-Fi reconnection attempts
-const WIFI_RETRY_DELAY: Duration = Duration::from_secs(5);
 
 /// MQTT topic used to report device availability
 const STATUS_TOPIC: Topic<&str> = Topic::Device("status");
@@ -282,94 +268,6 @@ async fn connect_to_device<'a, 'b>(
     Ok(dev)
 }
 
-#[embassy_executor::task]
-async fn network_stack_task(mut runner: Runner<'static, WifiDevice<'static>>) -> ! {
-    runner.run().await;
-}
-
-#[embassy_executor::task]
-async fn wifi_connect_task(mut controller: WifiController<'static>) -> ! {
-    loop {
-        match controller.connect_async().await {
-            Ok(()) => {
-                info!("Wi-Fi connected");
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
-                info!("Wi-Fi disconnected");
-            }
-            Err(err) => {
-                error!("Failed to connect to Wi-Fi: {err:?}");
-                embassy_time::Timer::after(WIFI_RETRY_DELAY).await;
-            }
-        }
-    }
-}
-
-fn init_wifi(wifi: WIFI<'static>) -> Result<(WifiController<'static>, WifiDevice<'static>)> {
-    static CONTROLLER: StaticCell<Controller<'_>> = StaticCell::new();
-
-    let controller = CONTROLLER.init(
-        esp_radio::init().map_err(|err| anyhow::anyhow!("Failed to initialize radio: {err:?}"))?,
-    );
-    let (mut controller, intfs) = wifi::new(
-        controller,
-        wifi,
-        wifi::Config::default().with_country_code(
-            CountryInfo::from(*b"01").with_operating_class(OperatingClass::Indoors),
-        ),
-    )
-    .map_err(|err| anyhow::anyhow!("Failed to create Wi-Fi controller: {err:?}"))?;
-
-    controller
-        .set_config(&ModeConfig::Client(
-            ClientConfig::default()
-                .with_ssid(env!("WIFI_SSID").into())
-                .with_password(env!("WIFI_PASSWORD").into()),
-        ))
-        .map_err(|err| anyhow::anyhow!("Failed to set Wi-Fi configuration: {err:?}"))?;
-    controller
-        .start()
-        .map_err(|err| anyhow::anyhow!("Failed to start Wi-Fi controller: {err:?}"))?;
-
-    Ok((controller, intfs.sta))
-}
-
-fn hostname_from_wifi(dev: &WifiDevice<'_>) -> Result<String> {
-    let mut hostname = String::with_capacity(32);
-
-    write!(&mut hostname, "freemdu_home_")?;
-
-    for byte in dev.mac_address() {
-        write!(&mut hostname, "{byte:02x}")?;
-    }
-
-    Ok(hostname)
-}
-
-fn init_network(
-    dev: WifiDevice<'static>,
-    hostname: &str,
-) -> Result<(Stack<'static>, Runner<'static, WifiDevice<'static>>)> {
-    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
-
-    let resources = RESOURCES.init(StackResources::new());
-    let rng = Rng::new();
-    let seed = (u64::from(rng.random()) << 32) | u64::from(rng.random());
-    let mut cfg = DhcpConfig::default();
-
-    cfg.hostname = Some(
-        hostname
-            .try_into()
-            .map_err(|err| anyhow::anyhow!("Failed to set DHCP hostname: {err:?}"))?,
-    );
-
-    Ok(embassy_net::new(
-        dev,
-        embassy_net::Config::dhcpv4(cfg),
-        resources,
-        seed,
-    ))
-}
-
 #[esp_rtos::main]
 async fn main(spawner: Spawner) {
     logger::init_logger_from_env();
@@ -385,9 +283,9 @@ async fn main(spawner: Spawner) {
 
     let port = freemdu_home::new_optical_port(peripherals.UART1).unwrap();
     let led = freemdu_home::new_status_led();
-    let (wifi_controller, wifi_dev) = init_wifi(peripherals.WIFI).unwrap();
-    let hostname = hostname_from_wifi(&wifi_dev).unwrap();
-    let (net_stack, net_runner) = init_network(wifi_dev, &hostname).unwrap();
+    let (wifi_controller, wifi_dev) = net::init_wifi(peripherals.WIFI).unwrap();
+    let hostname = net::hostname_from_wifi(&wifi_dev).unwrap();
+    let (net_stack, net_runner) = net::init_network(wifi_dev, &hostname).unwrap();
     let (mqtt_receiver, mqtt_task) =
         McutieBuilder::new(net_stack, "freemdu_home", env!("MQTT_HOSTNAME"))
             .with_authentication(env!("MQTT_USERNAME"), env!("MQTT_PASSWORD"))
@@ -399,6 +297,6 @@ async fn main(spawner: Spawner) {
     spawner
         .spawn(mqtt_message_task(mqtt_receiver, hostname, port, led))
         .unwrap();
-    spawner.spawn(network_stack_task(net_runner)).unwrap();
-    spawner.spawn(wifi_connect_task(wifi_controller)).unwrap();
+    spawner.spawn(net::network_stack_task(net_runner)).unwrap();
+    spawner.spawn(net::wifi_connect_task(wifi_controller)).unwrap();
 }

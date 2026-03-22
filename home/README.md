@@ -1,6 +1,6 @@
 # FreeMDU Home
 
-The FreeMDU home firmware provides a USB-UART bridge for Miele's optical diagnostic interface. It also features MQTT-based integration with Home Assistant.
+The FreeMDU home firmware provides a USB–optical bridge and a Wi‑Fi HTTP/WebSocket–optical bridge for Miele's diagnostic interface. It also features MQTT-based integration with Home Assistant.
 
 ## Getting started
 
@@ -34,13 +34,19 @@ cargo install espflash --locked
 cargo run --features esp32c6 --target riscv32imac-unknown-none-elf --release --bin <MODE>
 ```
 
-Replace `<MODE>` with the desired firmware mode (`bridge` or `standalone`). For the ESP32-C3, substitute `esp32c3` and `riscv32imc-unknown-none-elf`.
+Replace `<MODE>` with the desired firmware mode (`bridge`, `wifi_bridge`, or `standalone`). For the ESP32-C3, substitute `esp32c3` and `riscv32imc-unknown-none-elf`.
+
+If `cargo update` pulls **embassy-net** 0.8 for **picoserve** while **mcutie** still requires 0.7, unify with:
+
+```shell
+cargo update -p embassy-net:0.8.0 --precise 0.7.1
+```
 
 ## Usage
 
 <img src="ha.svg" alt="Home Assistant Screenshot" align="right">
 
-In bridge mode, connect the microcontroller to your desktop computer via USB. It appears as a USB CDC device and can be used like a standard serial port. In standalone mode, the firmware automatically connects to the configured Wi-Fi network and publishes MQTT data at regular intervals. It supports Home Assistant's [MQTT discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) feature, which automatically creates entities without manual configuration. The available entities may vary depending on the properties and actions supported by the connected Miele device.
+In bridge mode, connect the microcontroller to your desktop computer via USB; it appears as a USB CDC serial port. In **wifi_bridge** mode, open `http://<adapter-ip>:<port>/` in a browser for a short status line, then connect a WebSocket client to `ws://<adapter-ip>:<port>/optical`. In standalone mode, the firmware automatically connects to the configured Wi-Fi network and publishes MQTT data at regular intervals. It supports Home Assistant's [MQTT discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) feature, which automatically creates entities without manual configuration. The available entities may vary depending on the properties and actions supported by the connected Miele device.
 
 ### Receiving properties
 

@@ -1,5 +1,9 @@
 #![no_std]
 
+extern crate alloc;
+
+pub mod net;
+
 use embedded_io_async::{ErrorType, Read, ReadExactError, Write};
 use esp_hal::{
     Async,
@@ -18,6 +22,13 @@ macro_rules! num_from_env {
 }
 
 pub struct OpticalPort<'a>(Uart<'a, Async>);
+
+impl OpticalPort<'_> {
+    /// Copy bytes already in the UART RX FIFO. Does not wait for new data.
+    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, IoError> {
+        self.0.read_buffered(buf).map_err(IoError::Rx)
+    }
+}
 
 impl ErrorType for OpticalPort<'_> {
     type Error = IoError;

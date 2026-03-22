@@ -19,6 +19,9 @@ MQTT_PASSWORD = "PZrmSNk012cqv5EJ"
 # Interval (in seconds) for publishing device properties and actions
 DEVICE_PUBLISH_INTERVAL = "2"
 
+# TCP port for `wifi_bridge` HTTP / WebSocket server
+BRIDGE_HTTP_PORT = "8080"
+
 [target.'cfg(target_arch = "riscv32")']
 runner = "espflash flash --monitor"
 rustflags = [

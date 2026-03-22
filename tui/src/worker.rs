@@ -1,8 +1,6 @@
 use anyhow::{Context, Result};
-use freemdu::{
-    device::{self, Action, DeviceKind, Error, Property, PropertyKind, Value},
-    serial::Port,
-};
+use embedded_io_async::{Read, Write};
+use freemdu::device::{self, Action, DeviceKind, Error, Property, PropertyKind, Value};
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::{self, JoinHandle},
@@ -15,7 +13,7 @@ const DEVICE_TIMEOUT: Duration = Duration::from_secs(1);
 // Delay between device connection attempts
 const DEVICE_CONNECT_INTERVAL: Duration = Duration::from_secs(4);
 
-type Device<'a> = Box<dyn device::Device<&'a mut Port> + 'a>;
+type Device<'a, P> = Box<dyn device::Device<&'a mut P> + 'a>;
 
 #[derive(Debug)]
 pub enum Request {
@@ -36,17 +34,20 @@ pub enum Response {
     InvalidActionState(&'static Action),
 }
 
-pub struct Worker<'a> {
-    dev: Device<'a>,
+pub struct Worker<'a, P> {
+    dev: Device<'a, P>,
     tx: UnboundedSender<Response>,
 }
 
-impl Worker<'_> {
-    pub fn start(mut port: Port) -> (UnboundedReceiver<Response>, JoinHandle<Result<()>>) {
+impl<P> Worker<'_, P>
+where
+    P: Read + Write + Unpin + 'static,
+    P::Error: core::error::Error + Send + Sync + 'static,
+{
+    pub fn start(mut port: P) -> (UnboundedReceiver<Response>, JoinHandle<Result<()>>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let handle = task::spawn_local(async move {
             loop {
-                // Connect to device (retry on timeout)
                 match time::timeout(DEVICE_TIMEOUT, device::connect(&mut port)).await {
                     Ok(dev) => return Worker { dev: dev?, tx }.run().await,
                     Err(_) => time::sleep(DEVICE_CONNECT_INTERVAL).await,
@@ -67,7 +68,6 @@ impl Worker<'_> {
             tx,
         })?;
 
-        // Handle incoming commands from session channel
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 Request::QueryProperties(kind) => self

@@ -38,6 +38,7 @@ freemdu = { path = "../protocol" }
 log = "0.4.28"
 mcutie = { version = "0.3.0", features = ["log"] }
 static_cell = "2.1.1"
+picoserve = { version = "0.17.0", default-features = false, features = ["embassy", "ws", "log"] }
 
 [features]
 esp32c3 = [

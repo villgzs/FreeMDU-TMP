@@ -9,8 +9,9 @@ use crate::{
     worker::{Response, Worker},
 };
 use anyhow::{Context, Result};
-use clap::Parser;
-use freemdu::serial::{self, Port};
+use clap::{Parser, Subcommand};
+use embedded_io_async::{Read, Write};
+use freemdu::serial;
 use futures::{StreamExt, future::FutureExt};
 use ratatui::{
     DefaultTerminal,
@@ -23,11 +24,25 @@ use ratatui::{
 };
 use tokio::task::LocalSet;
 
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Local USB serial adapter (e.g. /dev/ttyACM0)
+    Serial {
+        /// Serial device path
+        path: String,
+    },
+    /// Remote optical bridge (`wifi_bridge` WebSocket `/optical`)
+    Remote {
+        /// WebSocket URL (e.g. ws://192.168.1.50:8080/optical)
+        url: String,
+    },
+}
+
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
-    /// Serial port path (e.g. /dev/ttyACM0)
-    serial_port: String,
+    #[command(subcommand)]
+    command: Command,
 }
 
 #[derive(Default, Debug)]
@@ -37,12 +52,15 @@ struct App {
 }
 
 impl App {
-    async fn run(&mut self, port: Port, term: &mut DefaultTerminal) -> Result<()> {
+    async fn run<P>(&mut self, port: P, term: &mut DefaultTerminal) -> Result<()>
+    where
+        P: Read + Write + Unpin + 'static,
+        P::Error: core::error::Error + Send + Sync + 'static,
+    {
         let mut events = EventStream::new();
         let (mut rx, mut worker) = Worker::start(port);
 
         while !self.should_exit {
-            // Draw terminal widgets
             term.draw(|frame| {
                 let mut cursor_pos = None;
 
@@ -53,7 +71,6 @@ impl App {
                 }
             })?;
 
-            // Handle terminal events and worker responses
             tokio::select! {
                 Some(evt) = events.next().fuse() => self
                     .handle_event(&evt?).context("Failed to handle event")?,
@@ -71,7 +88,6 @@ impl App {
         if let Some(sess) = &mut self.session
             && sess.handle_event(event)?
         {
-            // Event was handled by session
             return Ok(());
         }
 
@@ -134,7 +150,6 @@ impl StatefulWidget for &App {
         let inner = block.inner(area);
 
         if let Some(sess) = &self.session {
-            // Session might set cursor position state
             sess.render(inner, buf, state);
         } else {
             let [center] = Layout::vertical([Constraint::Length(1)])
@@ -151,12 +166,11 @@ impl StatefulWidget for &App {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
-    env_logger::init();
-
-    let args = Args::parse();
-    let port = serial::open(&args.serial_port).context("Failed to open serial port")?;
+async fn run_app<P>(port: P) -> Result<()>
+where
+    P: Read + Write + Unpin + 'static,
+    P::Error: core::error::Error + Send + Sync + 'static,
+{
     let mut term = ratatui::init();
     let res = LocalSet::new()
         .run_until(async move { App::default().run(port, &mut term).await })
@@ -165,4 +179,22 @@ async fn main() -> Result<()> {
     ratatui::restore();
 
     res
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+    env_logger::init();
+
+    match Args::parse().command {
+        Command::Serial { path } => {
+            let port = serial::open(&path).context("Failed to open serial port")?;
+            run_app(port).await
+        }
+        Command::Remote { url } => {
+            let port = freemdu::ws_bridge::WsBridgePort::connect(&url)
+                .await
+                .context("Failed to connect to WebSocket optical bridge")?;
+            run_app(port).await
+        }
+    }
 }

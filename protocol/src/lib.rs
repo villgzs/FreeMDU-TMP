@@ -139,6 +139,10 @@ extern crate alloc;
 
 pub mod device;
 
+#[cfg(feature = "bridge-ws-client")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bridge-ws-client")))]
+pub mod ws_bridge;
+
 #[cfg(feature = "native-serial")]
 #[cfg_attr(docsrs, doc(cfg(feature = "native-serial")))]
 pub mod serial;

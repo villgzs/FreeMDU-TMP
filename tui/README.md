@@ -14,13 +14,14 @@ The FreeMDU terminal UI (TUI) is a simple command-line application for diagnosin
 cargo build --release
 ```
 
-2. Run the application:
+2. Run the application over **USB serial** or the **Wi‑Fi WebSocket bridge**:
 
 ```shell
-./freemdu-tui /dev/ttyACM0
+./freemdu-tui serial /dev/ttyACM0
+./freemdu-tui remote ws://192.168.1.50:8080/optical
 ```
 
-Replace `/dev/ttyACM0` with the serial port of your communication adapter.
+Replace the serial path or WebSocket URL with your adapter’s settings (the URL must include the `/optical` path used by `wifi_bridge` firmware).
 
 ## Usage
 
@@ -46,7 +47,7 @@ Device actions can be triggered using the function keys `F1` through `F10`. If t
 If the application behaves unexpectedly, trace logging can be enabled using the `RUST_LOG` environment variable:
 
 ```shell
-RUST_LOG='freemdu=trace' ./freemdu-tui /dev/ttyACM0 2> log.txt
+RUST_LOG='freemdu=trace' ./freemdu-tui serial /dev/ttyACM0 2> log.txt
 ```
 
 > [!NOTE]

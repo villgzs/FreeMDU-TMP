@@ -51,9 +51,9 @@ Next, you'll need to build a [communication adapter](home/README.md#getting-star
 
 If you want to repair or test your appliance:
 
-1. Flash the [home](home) firmware in **bridge mode** onto your communication adapter and attach it to your device.
+1. Flash the [home](home) firmware in **bridge** mode (USB) or **wifi_bridge** mode (Wi‑Fi WebSocket) onto your communication adapter and attach it to your device.
 
-2. Run the [TUI](tui) application on your desktop computer.
+2. Run the [TUI](tui) on your computer (`serial …` or `remote ws://…/optical`, see the TUI readme).
 
 ### Integration into home automation systems
 
@@ -65,9 +65,9 @@ If you want to integrate your appliance into **Home Assistant** or another home 
 
 If you want to develop your own software to communicate with Miele devices:
 
-1. Flash the [home](home) firmware in **bridge mode** onto your communication adapter and attach it to your device.
+1. Flash the [home](home) firmware in **bridge** or **wifi_bridge** mode onto your communication adapter and attach it to your device.
 
-2. Use the [protocol](protocol) crate to implement your custom software.
+2. Use the [protocol](protocol) crate (`native-serial` and/or `bridge-ws-client`) to implement your custom software.
 
 ## Disclaimer
 

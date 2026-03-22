@@ -13,6 +13,7 @@ This crate can be used in `no_std` environments and embedded projects, but an al
 When adding this crate as a dependency, the following optional features can be specified (all disabled by default):
 
 - **`native-serial`**: enables a serial port implementation based on the [`serial2-tokio`](https://crates.io/crates/serial2-tokio) crate (requires `std`)
+- **`bridge-ws-client`**: enables [`ws_bridge`](src/ws_bridge.rs) for the Wi‑Fi `wifi_bridge` firmware WebSocket endpoint (requires `std`, Tokio)
 
 ## Examples
 
@@ -21,6 +22,7 @@ Several examples are provided to demonstrate the crate's functionality:
 - **`find_keys`**: finds the diagnostic keys of a device using a brute-force search
 - **`dump_memory`**: reads RAM and ROM data from a supported device and writes them to a file
 - **`dump_eeprom`**: reads the EEPROM contents from a supported device and writes them to a file
+- **`query_software_id_ws`**: connects over WebSocket and prints the device kind and software ID (requires `bridge-ws-client`)
 
 An example can be executed with the following command, replacing `<EXAMPLE>` with the desired example name:
 
