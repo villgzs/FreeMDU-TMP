@@ -3,7 +3,7 @@ use std::{
     fs::OpenOptions,
     io::{Seek, SeekFrom, Write},
 };
-
+//use freemdu::device::Device;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
@@ -12,8 +12,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     const START: u16 = 0x0000;
     const END: u16 = 0x07ff;
 
-    let mut port = freemdu::serial::open("/dev/cu.usbmodem14201")?;
+    let url = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "ws://127.0.0.1:8080/optical".to_string());
+
+    let mut port = freemdu::ws_bridge::WsBridgePort::connect(&url).await?;
     let mut dev = freemdu::device::connect(&mut port).await?;
+    
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)

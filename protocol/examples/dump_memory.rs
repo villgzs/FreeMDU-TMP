@@ -10,14 +10,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Adjust address range here
     const START: u32 = 0x0000_0000;
-    const END: u32 = 0x0000_ffff;
+    const END: u32 = 0x0000_5000;
 
-    let mut port = freemdu::serial::open("/dev/cu.usbmodem14201")?;
+    let url = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "ws://127.0.0.1:8080/optical".to_string());
+
+    let mut port = freemdu::ws_bridge::WsBridgePort::connect(&url).await?;
     let mut dev = freemdu::device::connect(&mut port).await?;
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("memory_dump.bin")?;
+        .open("memory_dump30katoen400rpm.bin")?;
 
     // Resume dumping process if previously interrupted
     let offset: u32 = file.seek(SeekFrom::End(0))?.try_into()?;
