@@ -9,6 +9,7 @@
 //! implementation based on the devices's software ID.
 
 pub mod id1998;
+pub mod id2465;
 pub mod id324;
 pub mod id360;
 pub mod id419;
@@ -456,6 +457,9 @@ pub async fn connect<'a, P: 'a + Read + Write>(
         }
         id1998::compatible_software_ids!() => {
             Ok(Box::new(id1998::WashingMachine::initialize(intf, id).await?) as Box<dyn Device<P>>)
+        }
+        id2465::compatible_software_ids!() => {
+            Ok(Box::new(id2465::WashingMachine::initialize(intf, id).await?) as Box<dyn Device<P>>)
         }
         _ => Err(Error::UnknownSoftwareId(id)),
     }
