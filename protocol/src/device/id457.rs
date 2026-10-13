@@ -118,6 +118,18 @@ const PROP_WATER_LEVEL: Property = Property {
     name: "Water Level",
     unit: Some("mmH₂O"),
 };
+const PROP_DOOR_LOCKED: Property = Property {
+    kind: PropertyKind::Operation,
+    id: "door_locked",
+    name: "Door Locked",
+    unit: None,
+};
+const PROP_TACHOMETER_SPEED: Property = Property {
+    kind: PropertyKind::Io,
+    id: "tachometer_speed",
+    name: "Tachometer Speed",
+    unit: Some("rpm"),
+};
 
 /// Washing machine operating state.
 ///
@@ -538,6 +550,32 @@ impl<P: Read + Write> WashingMachine<P> {
 
         Ok((current, target))
     }
+
+    /// Queries whether the door is locked.
+    ///
+    /// The lock closes when a program starts and opens once the drum has stopped after the
+    /// program: on a Miniwas run with a 1600 rpm final spin 46 seconds after the machine
+    /// reported [`OperatingState::ProgramFinished`], without a spin at once. The operating state
+    /// stays [`OperatingState::ProgramFinished`] until the door is opened, so this tells when the
+    /// laundry can actually be taken out.
+    pub async fn query_door_locked(&mut self) -> Result<bool, P::Error> {
+        let state: u8 = self.intf.read_memory(0x0044).await?;
+
+        Ok((state & 0x02) != 0x00)
+    }
+
+    /// Queries the drum speed measured by the tachometer generator and the target speed.
+    ///
+    /// Both are provided in `rpm` (revolutions per minute). The target is set during the final
+    /// spin only; the measured speed also shows the short spins between rinses. A large gap
+    /// between the two during the final spin means the machine is waiting for the load to
+    /// balance. When the program ends, both read 0 while the drum is still running down.
+    pub async fn query_tachometer_speed(&mut self) -> Result<(u16, u16), P::Error> {
+        let current: u16 = self.intf.read_memory(0x01a3).await?;
+        let target: u16 = self.intf.read_memory(0x028a).await?;
+
+        Ok((current, target))
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -593,8 +631,10 @@ impl<P: Read + Write> Device<P> for WashingMachine<P> {
             PROP_PROGRAM_PHASE,
             PROP_DISPLAY_CONTENTS,
             PROP_ACTIVE_ACTUATORS,
+            PROP_DOOR_LOCKED,
             PROP_TEMPERATURE,
             PROP_WATER_LEVEL,
+            PROP_TACHOMETER_SPEED,
         ]
     }
 
@@ -623,6 +663,8 @@ impl<P: Read + Write> Device<P> for WashingMachine<P> {
             PROP_ACTIVE_ACTUATORS => Ok(self.query_active_actuators().await?.to_string().into()),
             PROP_TEMPERATURE => Ok(self.query_temperature().await?.into()),
             PROP_WATER_LEVEL => Ok(self.query_water_level().await?.into()),
+            PROP_DOOR_LOCKED => Ok(self.query_door_locked().await?.into()),
+            PROP_TACHOMETER_SPEED => Ok(self.query_tachometer_speed().await?.into()),
             _ => Err(Error::UnknownProperty),
         }
     }
